@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { use } from 'echarts/core'
 import { LineChart, PieChart } from 'echarts/charts'
@@ -12,7 +11,7 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart, { THEME_KEY } from 'vue-echarts'
-import { computed, provide } from 'vue'
+import { computed, provide, onMounted } from 'vue'
 
 use([
   TitleComponent,
@@ -48,7 +47,8 @@ const form = reactive({
 })
 
 
-const loading = ref(false)
+const savedPlans = ref<any[]>([])
+loadPlans()
 
 const addAllocation = () => {
   form.allocations.push({ name: '', value: 10, subAllocations: [] as {name: string, value: number}[] })
@@ -267,16 +267,34 @@ const investedPerAllocation = computed(() => {
   })
 })
 
-const submitPlan = async () => {
-  loading.value = true
-  try {
-    await axios.post('http://localhost:3333/api/plans', form)
-    ElMessage.success('Plan successfully saved!')
-  } catch (error) {
-    ElMessage.error('Error saving the plan. Make sure backend is running.')
-  } finally {
-    loading.value = false
+
+async function loadPlans() {
+  const plans = localStorage.getItem('finplanner:plans')
+  if (plans) {
+    try {
+      savedPlans.value = JSON.parse(plans)
+    } catch (e) {
+      console.error('Failed to parse saved plans', e)
+    }
   }
+}
+
+const submitPlan = () => {
+  const planToSave = JSON.parse(JSON.stringify(form))
+  savedPlans.value.push(planToSave)
+  localStorage.setItem('finplanner:plans', JSON.stringify(savedPlans.value))
+  ElMessage.success('Plan successfully saved!')
+}
+
+const loadPlan = (plan: any) => {
+  Object.assign(form, JSON.parse(JSON.stringify(plan)))
+  ElMessage.info(`Plan chargé: ${plan.title || 'Sans titre'}`)
+}
+
+const deletePlan = (index: number) => {
+  savedPlans.value.splice(index, 1)
+  localStorage.setItem('finplanner:plans', JSON.stringify(savedPlans.value))
+  ElMessage.success('Plan supprimé!')
 }
 </script>
 
@@ -287,6 +305,18 @@ const submitPlan = async () => {
     </el-header>
     <el-main>
       <div class="left-column">
+        <el-card v-if="savedPlans.length > 0" class="form-card" shadow="hover" style="margin-bottom: 20px;">
+          <h3 class="allocation-title" style="margin-bottom: 10px;">Plans Sauvegardés</h3>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <div v-for="(plan, index) in savedPlans" :key="index" style="display: flex; align-items: center;">
+              <el-button @click="loadPlan(plan)" size="small">
+                {{ plan.title || 'Plan sans titre' }}
+              </el-button>
+              <el-button type="danger" @click="deletePlan(index)" circle size="small" style="margin-left: 5px;" plain>X</el-button>
+            </div>
+          </div>
+        </el-card>
+
         <el-card class="form-card" shadow="hover">
           <el-form :model="form" label-position="top">
             <el-form-item label="Plan">
