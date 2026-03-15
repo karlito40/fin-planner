@@ -11,7 +11,7 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart, { THEME_KEY } from 'vue-echarts'
-import { computed, provide, onMounted } from 'vue'
+import { computed, provide } from 'vue'
 
 use([
   TitleComponent,
@@ -296,23 +296,88 @@ const deletePlan = (index: number) => {
   localStorage.setItem('finplanner:plans', JSON.stringify(savedPlans.value))
   ElMessage.success('Plan supprimé!')
 }
+
+const exportPlans = () => {
+  if (savedPlans.value.length === 0) {
+    ElMessage.warning('Aucun plan à exporter')
+    return
+  }
+  const dataStr = JSON.stringify(savedPlans.value, null, 2)
+  const blob = new Blob([dataStr], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.setAttribute('download', 'finplanner.json')
+  document.body.appendChild(link)
+  link.click()
+  // document.body.removeChild(link)
+  
+  // setTimeout(() => {
+  //   URL.revokeObjectURL(url)
+  // }, 1000)
+
+  ElMessage.success('Plans exportés avec succès!')
+}
+
+const importPlans = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'application/json'
+  input.onchange = (e) => {
+    const target = e.target as HTMLInputElement
+    const file = target.files?.[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const result = event.target?.result as string
+        const parsed = JSON.parse(result)
+        if (Array.isArray(parsed)) {
+          savedPlans.value = parsed
+          localStorage.setItem('finplanner:plans', JSON.stringify(savedPlans.value))
+          ElMessage.success('Plans importés avec succès!')
+        } else {
+          ElMessage.error('Le fichier ne contient pas de plans valides.')
+        }
+      } catch (err) {
+        ElMessage.error('Erreur lors de la lecture du fichier JSON.')
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
+}
 </script>
 
 <template>
   <el-container class="app-container">
     <el-header class="app-header">
-      <h2>Financial Investment Planner</h2>
+      <h2>Investment Planner</h2>
+      <div class="spacer"></div>
+      <el-button size="default" plain @click="importPlans">
+        Importer
+        <el-icon class="el-icon--right">
+          <Upload />
+        </el-icon>
+      </el-button>
+      <el-button size="default" plain @click="exportPlans">
+        Exporter
+        <el-icon class="el-icon--right">
+          <Download />
+        </el-icon>
+      </el-button>
     </el-header>
     <el-main>
       <div class="left-column">
-        <el-card v-if="savedPlans.length > 0" class="form-card" shadow="hover" style="margin-bottom: 20px;">
-          <h3 class="allocation-title" style="margin-bottom: 10px;">Plans Sauvegardés</h3>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <el-card v-if="savedPlans.length > 0" class="form-card plans-card" shadow="hover">
+          <h3 class="card-title">Plans Sauvegardés</h3>
+          <div class="plans-card__body">
             <div v-for="(plan, index) in savedPlans" :key="index" style="display: flex; align-items: center;">
-              <el-button @click="loadPlan(plan)" size="small">
+              <el-button size="small" @click="loadPlan(plan)">
                 {{ plan.title || 'Plan sans titre' }}
               </el-button>
-              <el-button type="danger" @click="deletePlan(index)" circle size="small" style="margin-left: 5px;" plain>X</el-button>
+              <el-button class="delete-btn" type="danger" circle plain size="small" @click="deletePlan(index)">X</el-button>
             </div>
           </div>
         </el-card>
@@ -340,7 +405,7 @@ const deletePlan = (index: number) => {
             </el-form-item>
 
             <el-form-item>
-              <el-button type="primary" @click="submitPlan" :loading="loading" class="submit-btn">
+              <el-button type="primary" class="submit-btn" @click="submitPlan">
                 Générer le plan
               </el-button>
             </el-form-item>
@@ -348,14 +413,14 @@ const deletePlan = (index: number) => {
         </el-card>
 
         <el-card class="form-card allocation-card" shadow="hover">
-          <h3 class="allocation-title">Répartition des investissements</h3>
+          <h3 class="card-title">Répartition des investissements</h3>
           
           <div v-for="(item, index) in form.allocations" :key="index" class="allocation-block">
             <div class="allocation-row">
               <el-input v-model="item.name" placeholder="Nom (ex: Actions)" class="allocation-input" />
               <el-input-number v-model="item.value" :min="0" :max="100" class="allocation-number" />
               <span class="allocation-percent">%</span>
-              <el-button type="danger" @click="removeAllocation(index)" circle size="small">X</el-button>
+              <el-button type="danger" circle size="small" @click="removeAllocation(index)">X</el-button>
             </div>
             
             <div class="sub-allocations-container">
@@ -364,9 +429,9 @@ const deletePlan = (index: number) => {
                 <el-input v-model="sub.name" placeholder="Sous-section..." size="small" class="sub-input" />
                 <el-input-number v-model="sub.value" :min="0" :max="100" size="small" class="sub-number" />
                 <span class="sub-percent">%</span>
-                <el-button type="danger" @click="removeSubAllocation(index, sIndex)" circle size="small" plain>X</el-button>
+                <el-button type="danger" circle size="small" plain @click="removeSubAllocation(index, sIndex)">X</el-button>
               </div>
-              <el-button type="primary" link @click="addSubAllocation(index)" class="add-sub-btn" size="small">
+              <el-button type="primary" link class="add-sub-btn" size="small" @click="addSubAllocation(index)">
                 + Ajouter une sous-section
               </el-button>
               
@@ -376,7 +441,7 @@ const deletePlan = (index: number) => {
             </div>
           </div>
 
-          <el-button type="default" @click="addAllocation" class="add-btn">
+          <el-button type="default" class="add-btn" @click="addAllocation">
             + Ajouter une section
           </el-button>
 
@@ -413,7 +478,7 @@ const deletePlan = (index: number) => {
 
         <el-card class="chart-card invest-allocation-card" shadow="hover">
           <div class="allocation-header-container">
-            <h3 class="allocation-title">Montant investi par allocation</h3>
+            <h3 class="card-title">Montant investi par allocation</h3>
             <el-button v-if="isCustomInvested" size="small" type="primary" link @click="isCustomInvested = false">
               Réinitialiser
             </el-button>
@@ -468,12 +533,17 @@ const deletePlan = (index: number) => {
 }
 
 .app-header {
-  background-color: #409EFF;
-  color: white;
   display: flex;
   align-items: center;
-  justify-content: center;
+  background-color: #409EFF;
+  color: white;
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+}
+
+.spacer { flex: 1 }
+
+.export-btn {
+  
 }
 
 .app-header h2 {
@@ -501,10 +571,10 @@ const deletePlan = (index: number) => {
   border-radius: 8px;
 }
 
-.allocation-title {
+.card-title {
   margin-top: 0;
-  margin-bottom: 20px;
-  font-size: 16px;
+  margin-bottom: 1rem;
+  font-size: 1rem;
   color: #303133;
 }
 
@@ -595,28 +665,23 @@ const deletePlan = (index: number) => {
 }
 
 .pie-chart-container {
-  margin-top: 20px;
-  height: 350px;
-  width: 100%;
-}
-
-.pie-chart {
-  height: 100%;
+  margin-top: 1.2rem;
+  height: 21.875rem;
   width: 100%;
 }
 
 .submit-btn {
   width: 100%;
-  margin-top: 20px;
+  margin-top: 1.2rem;
 }
 
 .right-column {
   width: 100%;
-  max-width: 600px;
+  max-width: 37.5rem;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  margin-left: 20px;
+  gap: 1.2rem;
+  margin-left: 1.2rem;
 }
 
 .chart-card {
@@ -625,14 +690,14 @@ const deletePlan = (index: number) => {
 }
 
 .amount-item {
-  margin-bottom: 15px;
+  margin-bottom: 0.9rem;
 }
 
 .amount-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 500;
   color: #303133;
 }
@@ -643,18 +708,18 @@ const deletePlan = (index: number) => {
 }
 
 .sub-amount-list {
-  margin-top: 8px;
-  padding-left: 10px;
+  margin-top: 0.3rem;
+  padding-left: 0.6rem;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 0.3rem;
 }
 
 .sub-amount-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 14px;
+  font-size: 0.9rem;
   color: #606266;
 }
 
@@ -663,8 +728,8 @@ const deletePlan = (index: number) => {
 }
 
 .total-invested-row {
-  margin-top: 15px;
-  font-size: 18px;
+  margin-top: 0.9rem;
+  font-size: 1rem;
   font-weight: bold;
   color: #303133;
 }
@@ -673,8 +738,8 @@ const deletePlan = (index: number) => {
 }
 
 .real-total-row {
-  margin-top: 5px;
-  font-size: 14px;
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
   color: #909399;
 }
 .real-total-row .amount-value {
@@ -682,28 +747,17 @@ const deletePlan = (index: number) => {
   font-weight: normal;
 }
 
-.allocation-header-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.allocation-header-container .allocation-title {
-  margin-bottom: 0;
-}
-
 .custom-amount-slider {
-  margin-bottom: 25px;
-  padding: 15px;
+  margin-bottom: 1.5rem;
+  padding: 0.9rem;
   background-color: #f5f7fa;
   border-radius: 8px;
 }
 
 .slider-label {
   display: block;
-  margin-bottom: 15px;
-  font-size: 14px;
+  margin-bottom: 0.9rem;
+  font-size: 0.9rem;
   color: #606266;
 }
 
@@ -735,10 +789,10 @@ const deletePlan = (index: number) => {
 
 .final-amount {
   display: block;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: bold;
   color: #303133;
-  margin-top: 5px;
+  margin-top: 0.3rem;
 }
 
 /* Mobile Responsiveness */
@@ -746,14 +800,14 @@ const deletePlan = (index: number) => {
   .el-main {
     flex-direction: column;
     align-items: center;
-    padding: 20px 10px;
+    padding: 1.2rem 0.6rem;
   }
   .left-column, .right-column {
     max-width: 100%;
   }
   .right-column {
     margin-left: 0;
-    margin-top: 20px;
+    margin-top: 1.2rem;
   }
 }
 
@@ -780,15 +834,24 @@ const deletePlan = (index: number) => {
     gap: 10px;
   }
   .amount-row {
-    font-size: 14px;
+    font-size: 0.9rem;
   }
   .total-invested-row {
-    font-size: 16px;
+    font-size: 1rem;
   }
 }
 
 .chart-card :deep(.el-card__body) {
   overflow: visible;
+}
+
+.delete-btn { margin-left: 0.4rem; }
+
+.plans-card { margin-bottom: 0.3rem; }
+.plans-card__body {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 </style>
 
