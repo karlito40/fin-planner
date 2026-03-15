@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, provide } from 'vue'
 import { ElMessage } from 'element-plus'
 import { use } from 'echarts/core'
 import { LineChart, PieChart } from 'echarts/charts'
@@ -11,7 +11,6 @@ import {
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart, { THEME_KEY } from 'vue-echarts'
-import { computed, provide } from 'vue'
 import { useInvestmentPlan } from './features/useInvestmentPlan'
 import PlanFormRenderer from './components/PlanFormRenderer.vue'
 import PlanListSection from './components/PlanListSection.vue'
@@ -291,6 +290,7 @@ function submitPlan() {
     <el-header class="app-header">
       <h2>Investment Planner</h2>
       <div class="spacer"></div>
+      
       <el-button size="default" plain @click="importPlans">
         <span class="hidden-sm-and-down">Importer</span>
         <el-icon class="el-icon--right">
@@ -359,7 +359,6 @@ function submitPlan() {
         <el-card class="finplanner-card" shadow="hover">
           <v-chart class="chart" :option="chartOptions" autoresize />
           
-
           <div class="final-resume">
             <div class="final-value-container">
               <h3>Total à la fin de l'investissement:</h3>

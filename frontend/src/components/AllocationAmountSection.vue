@@ -1,7 +1,7 @@
 <template>
   <div class="AllocationAmountSection">
     <div class="custom-amount-slider">
-      <span class="slider-label">Capital de référence: <strong>€{{ displayInvestedAmount.toLocaleString(undefined, {maximumFractionDigits: 0}) }}</strong></span>
+      <span class="slider-label">Capital de référence: <strong>€{{ displayInvestedAmount!.toLocaleString(undefined, {maximumFractionDigits: 0}) }}</strong></span>
       <el-slider 
         v-model="displayInvestedAmount" 
         :min="0" 
@@ -29,7 +29,7 @@
       
       <div class="amount-row total-invested-row">
         <span class="amount-name">Total distribué</span>
-        <span class="amount-value">€{{ displayInvestedAmount.toLocaleString(undefined, {maximumFractionDigits: 0}) }}</span>
+        <span class="amount-value">€{{ displayInvestedAmount!.toLocaleString(undefined, {maximumFractionDigits: 0}) }}</span>
       </div>
       <div v-if="isCustomInvested" class="amount-row real-total-row">
         <span class="amount-name">Total investi réel</span>
