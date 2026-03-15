@@ -1,3 +1,3 @@
 Nothing to see here
 
-90% Vibe code for my own needed
+65% Vibe code for my own needed

@@ -21,9 +21,9 @@
     </el-form-item>
 
     <el-form-item>
-      <!-- should be on el-form but not possible with element -->
-      <el-button v-if="form.title && form.timeHorizon && form.initialCapital && form.monthlyDca && form.expectedAnnualReturn" type="primary" class="submit-btn" @click="$emit('submit')">
-        Générer le plan
+      <!-- submit should be put on el-form but not possible with element -->
+      <el-button type="primary" class="submit-btn" @click="$emit('submit')">
+        {{ form.id ? 'Modifier le plan' : 'Générer le plan' }}
       </el-button>
     </el-form-item>
   </el-form>
