@@ -12,6 +12,11 @@ import {
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart, { THEME_KEY } from 'vue-echarts'
 import { computed, provide } from 'vue'
+import { useInvestmentPlan } from './features/useInvestmentPlan'
+import PlanFormRenderer from './components/PlanFormRenderer.vue'
+import PlanListSection from './components/PlanListSection.vue'
+import FinPlannerCard from './components/FinPlannerCard.vue'
+import AllocationAmountSection from './components/AllocationAmountSection.vue'
 
 use([
   TitleComponent,
@@ -25,6 +30,8 @@ use([
 
 provide(THEME_KEY, 'light')
 
+const { savedPlans, importPlans, exportPlans, savePlan, deletePlan } = useInvestmentPlan()
+
 const form = reactive({
   title: '',
   timeHorizon: 5,
@@ -36,8 +43,8 @@ const form = reactive({
       name: 'Actions', 
       value: 50,
       subAllocations: [
-        { name: 'Apple', value: 20 },
-        { name: 'Microsoft', value: 80 }
+        // { name: 'Apple', value: 20 },
+        // { name: 'Microsoft', value: 80 }
       ] as {name: string, value: number}[]
     },
     { name: 'Obligations', value: 30, subAllocations: [] as {name: string, value: number}[] },
@@ -47,8 +54,7 @@ const form = reactive({
 })
 
 
-const savedPlans = ref<any[]>([])
-loadPlans()
+
 
 const addAllocation = () => {
   form.allocations.push({ name: '', value: 10, subAllocations: [] as {name: string, value: number}[] })
@@ -267,87 +273,17 @@ const investedPerAllocation = computed(() => {
   })
 })
 
-
-async function loadPlans() {
-  const plans = localStorage.getItem('finplanner:plans')
-  if (plans) {
-    try {
-      savedPlans.value = JSON.parse(plans)
-    } catch (e) {
-      console.error('Failed to parse saved plans', e)
-    }
-  }
-}
-
-const submitPlan = () => {
-  const planToSave = JSON.parse(JSON.stringify(form))
-  savedPlans.value.push(planToSave)
-  localStorage.setItem('finplanner:plans', JSON.stringify(savedPlans.value))
-  ElMessage.success('Plan successfully saved!')
-}
-
-const loadPlan = (plan: any) => {
+function loadPlan(plan: any) {
   Object.assign(form, JSON.parse(JSON.stringify(plan)))
   ElMessage.info(`Plan chargé: ${plan.title || 'Sans titre'}`)
 }
 
-const deletePlan = (index: number) => {
-  savedPlans.value.splice(index, 1)
-  localStorage.setItem('finplanner:plans', JSON.stringify(savedPlans.value))
-  ElMessage.success('Plan supprimé!')
+
+
+function submitPlan() {
+  savePlan(form)
 }
 
-const exportPlans = () => {
-  if (savedPlans.value.length === 0) {
-    ElMessage.warning('Aucun plan à exporter')
-    return
-  }
-  const dataStr = JSON.stringify(savedPlans.value, null, 2)
-  const blob = new Blob([dataStr], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.setAttribute('download', 'finplanner.json')
-  document.body.appendChild(link)
-  link.click()
-  // document.body.removeChild(link)
-  
-  // setTimeout(() => {
-  //   URL.revokeObjectURL(url)
-  // }, 1000)
-
-  ElMessage.success('Plans exportés avec succès!')
-}
-
-const importPlans = () => {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'application/json'
-  input.onchange = (e) => {
-    const target = e.target as HTMLInputElement
-    const file = target.files?.[0]
-    if (!file) return
-    
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      try {
-        const result = event.target?.result as string
-        const parsed = JSON.parse(result)
-        if (Array.isArray(parsed)) {
-          savedPlans.value = parsed
-          localStorage.setItem('finplanner:plans', JSON.stringify(savedPlans.value))
-          ElMessage.success('Plans importés avec succès!')
-        } else {
-          ElMessage.error('Le fichier ne contient pas de plans valides.')
-        }
-      } catch (err) {
-        ElMessage.error('Erreur lors de la lecture du fichier JSON.')
-      }
-    }
-    reader.readAsText(file)
-  }
-  input.click()
-}
 </script>
 
 <template>
@@ -356,13 +292,13 @@ const importPlans = () => {
       <h2>Investment Planner</h2>
       <div class="spacer"></div>
       <el-button size="default" plain @click="importPlans">
-        Importer
+        <span class="hidden-sm-and-down">Importer</span>
         <el-icon class="el-icon--right">
           <Upload />
         </el-icon>
       </el-button>
       <el-button size="default" plain @click="exportPlans">
-        Exporter
+        <span class="hidden-sm-and-down">Exporter</span>
         <el-icon class="el-icon--right">
           <Download />
         </el-icon>
@@ -370,51 +306,15 @@ const importPlans = () => {
     </el-header>
     <el-main>
       <div class="left-column">
-        <el-card v-if="savedPlans.length > 0" class="form-card plans-card" shadow="hover">
-          <h3 class="card-title">Plans Sauvegardés</h3>
-          <div class="plans-card__body">
-            <div v-for="(plan, index) in savedPlans" :key="index" style="display: flex; align-items: center;">
-              <el-button size="small" @click="loadPlan(plan)">
-                {{ plan.title || 'Plan sans titre' }}
-              </el-button>
-              <el-button class="delete-btn" type="danger" circle plain size="small" @click="deletePlan(index)">X</el-button>
-            </div>
-          </div>
+        <FinPlannerCard v-if="savedPlans.length > 0" title="Plans Sauvegardés">
+          <PlanListSection :plans="savedPlans" @click:load="loadPlan" @click:delete="deletePlan" />
+        </FinPlannerCard>
+        
+        <el-card class="finplanner-card" shadow="hover">
+          <PlanFormRenderer :form="form" @submit="submitPlan" />
         </el-card>
 
-        <el-card class="form-card" shadow="hover">
-          <el-form :model="form" label-position="top">
-            <el-form-item label="Plan">
-              <el-input v-model="form.title" placeholder="My Retirement Plan, etc." />
-            </el-form-item>
-
-            <el-form-item label="Horizon de Temps (Années)">
-              <el-slider v-model="form.timeHorizon" :min="1" :max="40" :step="1" show-input />
-            </el-form-item>
-            
-            <el-form-item label="Capital Initial (€)">
-              <el-input-number v-model="form.initialCapital" :min="0" :step="100" style="width: 100%" />
-            </el-form-item>
-
-            <el-form-item label="DCA Mensuel (€)">
-              <el-input-number v-model="form.monthlyDca" :min="0" :step="50" style="width: 100%" />
-            </el-form-item>
-
-            <el-form-item label="Taux d'intérêt estimé (%)">
-              <el-slider v-model="form.expectedAnnualReturn" :min="1" :max="20" :step="0.5" show-input />
-            </el-form-item>
-
-            <el-form-item>
-              <el-button type="primary" class="submit-btn" @click="submitPlan">
-                Générer le plan
-              </el-button>
-            </el-form-item>
-          </el-form>
-        </el-card>
-
-        <el-card class="form-card allocation-card" shadow="hover">
-          <h3 class="card-title">Répartition des investissements</h3>
-          
+        <FinPlannerCard title="Répartition des investissements">
           <div v-for="(item, index) in form.allocations" :key="index" class="allocation-block">
             <div class="allocation-row">
               <el-input v-model="item.name" placeholder="Nom (ex: Actions)" class="allocation-input" />
@@ -426,7 +326,7 @@ const importPlans = () => {
             <div class="sub-allocations-container">
               <div v-for="(sub, sIndex) in item.subAllocations" :key="sIndex" class="sub-allocation-row">
                 <span class="sub-arrow">↳</span>
-                <el-input v-model="sub.name" placeholder="Sous-section..." size="small" class="sub-input" />
+                <el-input v-model="sub.name" placeholder="iShare MSCI World, Amundi, SCPI..." size="small" class="sub-input" />
                 <el-input-number v-model="sub.value" :min="0" :max="100" size="small" class="sub-number" />
                 <span class="sub-percent">%</span>
                 <el-button type="danger" circle size="small" plain @click="removeSubAllocation(index, sIndex)">X</el-button>
@@ -452,11 +352,11 @@ const importPlans = () => {
           <div class="pie-chart-container">
             <v-chart class="chart pie-chart" :option="pieChartOptions" autoresize />
           </div>
-        </el-card>
+        </FinPlannerCard>
       </div>
 
       <div class="right-column">
-        <el-card class="chart-card" shadow="hover">
+        <el-card class="finplanner-card" shadow="hover">
           <v-chart class="chart" :option="chartOptions" autoresize />
           
 
@@ -476,51 +376,19 @@ const importPlans = () => {
           </div>
         </el-card>
 
-        <el-card class="chart-card invest-allocation-card" shadow="hover">
-          <div class="allocation-header-container">
-            <h3 class="card-title">Montant investi par allocation</h3>
-            <el-button v-if="isCustomInvested" size="small" type="primary" link @click="isCustomInvested = false">
+        <FinPlannerCard title="Montant investi par allocation">
+          <template v-if="isCustomInvested" #header-actions>  
+            <el-button size="small" type="primary" link @click="isCustomInvested = false">
               Réinitialiser
             </el-button>
-          </div>
-          
-          <div class="custom-amount-slider">
-            <span class="slider-label">Capital de référence: <strong>€{{ displayInvestedAmount.toLocaleString(undefined, {maximumFractionDigits: 0}) }}</strong></span>
-            <el-slider 
-              v-model="displayInvestedAmount" 
-              :min="0" 
-              :max="Math.max(totalInvested * 3, 100000)" 
-              :step="1000" 
-              :show-tooltip="false"
-            />
-          </div>
-
-          <div class="allocation-amounts-list">
-            <div v-for="item in investedPerAllocation" :key="item.name" class="amount-item">
-              <div class="amount-row">
-                <span class="amount-name">{{ item.name }}</span>
-                <span class="amount-value">€{{ item.amount.toLocaleString(undefined, {maximumFractionDigits: 0}) }}</span>
-              </div>
-              <div v-if="item.subAllocations && item.subAllocations.length" class="sub-amount-list">
-                <div v-for="sub in item.subAllocations" :key="sub.name" class="sub-amount-row">
-                  <span class="sub-amount-name">↳ {{ sub.name }}</span>
-                  <span class="sub-amount-value">€{{ sub.amount.toLocaleString(undefined, {maximumFractionDigits: 0}) }}</span>
-                </div>
-              </div>
-            </div>
-            
-            <el-divider></el-divider>
-            
-            <div class="amount-row total-invested-row">
-              <span class="amount-name">Total distribué</span>
-              <span class="amount-value">€{{ displayInvestedAmount.toLocaleString(undefined, {maximumFractionDigits: 0}) }}</span>
-            </div>
-            <div v-if="isCustomInvested" class="amount-row real-total-row">
-              <span class="amount-name">Total investi réel</span>
-              <span class="amount-value">€{{ totalInvested.toLocaleString(undefined, {maximumFractionDigits: 0}) }}</span>
-            </div>
-          </div>
-        </el-card>
+          </template>
+          <AllocationAmountSection 
+            v-model:displayInvestedAmount="displayInvestedAmount" 
+            :totalInvested="totalInvested" 
+            :investedPerAllocation="investedPerAllocation" 
+            :isCustomInvested="isCustomInvested"
+          />
+        </FinPlannerCard>
       </div>
     </el-main>
   </el-container>
@@ -564,18 +432,6 @@ const importPlans = () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-.form-card {
-  width: 100%;
-  border-radius: 8px;
-}
-
-.card-title {
-  margin-top: 0;
-  margin-bottom: 1rem;
-  font-size: 1rem;
-  color: #303133;
 }
 
 .allocation-block {
@@ -684,83 +540,6 @@ const importPlans = () => {
   margin-left: 1.2rem;
 }
 
-.chart-card {
-  width: 100%;
-  border-radius: 8px;
-}
-
-.amount-item {
-  margin-bottom: 0.9rem;
-}
-
-.amount-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #303133;
-}
-
-.amount-value {
-  color: #409EFF;
-  font-weight: bold;
-}
-
-.sub-amount-list {
-  margin-top: 0.3rem;
-  padding-left: 0.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.sub-amount-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.9rem;
-  color: #606266;
-}
-
-.sub-amount-value {
-  color: #909399;
-}
-
-.total-invested-row {
-  margin-top: 0.9rem;
-  font-size: 1rem;
-  font-weight: bold;
-  color: #303133;
-}
-.total-invested-row .amount-value {
-  color: #67c23a;
-}
-
-.real-total-row {
-  margin-top: 0.3rem;
-  font-size: 0.9rem;
-  color: #909399;
-}
-.real-total-row .amount-value {
-  color: #909399;
-  font-weight: normal;
-}
-
-.custom-amount-slider {
-  margin-bottom: 1.5rem;
-  padding: 0.9rem;
-  background-color: #f5f7fa;
-  border-radius: 8px;
-}
-
-.slider-label {
-  display: block;
-  margin-bottom: 0.9rem;
-  font-size: 0.9rem;
-  color: #606266;
-}
-
 .chart {
   height: 400px;
   width: 100%;
@@ -828,24 +607,7 @@ const importPlans = () => {
   .chart, .pie-chart-container {
     height: 300px;
   }
-  .allocation-header-container {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  .amount-row {
-    font-size: 0.9rem;
-  }
-  .total-invested-row {
-    font-size: 1rem;
-  }
 }
-
-.chart-card :deep(.el-card__body) {
-  overflow: visible;
-}
-
-.delete-btn { margin-left: 0.4rem; }
 
 .plans-card { margin-bottom: 0.3rem; }
 .plans-card__body {
